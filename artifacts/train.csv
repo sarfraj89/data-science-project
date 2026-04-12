@@ -1,0 +1,17 @@
+age,salary,experience,city,target
+25,35000,1,Delhi,0
+34,59000,6,Bhopal,1
+24,32000,1,Nagpur,0
+28,42000,2,Mumbai,0
+31,54000,4,Noida,1
+41,78000,12,Chennai,1
+26,36000,1,Surat,0
+35,61000,7,Hyderabad,1
+38,70000,9,Visakhapatnam,1
+36,65000,8,Kochi,1
+39,72000,10,Patna,1
+32,52000,5,Bengaluru,1
+27,39000,2,Ahmedabad,0
+22,28000,0,Kanpur,0
+29,47000,3,Pune,0
+33,56000,6,Indore,1
