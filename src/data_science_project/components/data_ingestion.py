@@ -2,7 +2,7 @@ import os
 import sys
 from src.data_science_project.exception import CustomException
 from src.data_science_project.logger import logging
-import pandas as pd
+from src.data_science_project.utils import read_sql_data
 
 from dataclasses import dataclass
 
@@ -12,7 +12,6 @@ class DataIngestionConfig:
     train_data_path:str=os.path.join('artifacts','train.csv')
     test_data_path:str=os.path.join('artifacts','test.csv')
     raw_data_path:str=os.path.join('artifacts','raw.csv')
-    source_data_path:str=os.path.join('notebook','data','raw.csv')
 
 class DataIngestion:
     def __init__(self):
@@ -21,21 +20,11 @@ class DataIngestion:
     def initiate_data_ingestion(self):
         try:
             ##reading the data from mysql
-            candidate_paths = [
-                os.environ.get("DATA_SOURCE_PATH"),
-                self.ingestion_config.source_data_path,
-                os.path.join("data", "raw.csv"),
-            ]
-            source_path = next((p for p in candidate_paths if p and os.path.exists(p)), None)
+            df = read_sql_data()
+            logging.info("Reading completed source data")
 
-            if source_path is None:
-                raise FileNotFoundError(
-                    "Raw data file not found. Add a CSV at notebook/data/raw.csv or data/raw.csv, "
-                    "or set DATA_SOURCE_PATH to your CSV file path."
-                )
-
-            df=pd.read_csv(source_path)
-            logging.info("Reading completed mysql database")
+            print(df.head())
+            print(f"\n[{df.shape[0]} rows x {df.shape[1]} columns]")
 
             os.makedirs(os.path.dirname(self.ingestion_config.train_data_path),exist_ok=True)
 
