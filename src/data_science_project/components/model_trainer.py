@@ -127,9 +127,9 @@ class ModelTrainer:
 
             if mlflow is not None:
                 try:
-                    mlflow.set_registry_uri("https://dagshub.com/krishnaik06/mlprojecthindi.mlflow")
+                    mlflow.set_registry_uri("https://dagshub.com/try.sarfraj/data-science-project.mlflow")
                     tracking_url_type_store = urlparse(mlflow.get_tracking_uri()).scheme
-
+            # mlflow
                     with mlflow.start_run():
 
                         (rmse, mae, r2) = self.eval_metrics(y_test, predicted)
