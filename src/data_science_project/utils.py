@@ -1,54 +1,105 @@
-import importlib
 import os
+import sys
+from src.data_science_project.exception import CustomException
+from src.data_science_project.logger import logging
 import pandas as pd
+from dotenv import load_dotenv
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import r2_score
+import pymysql
+
+import pickle
+import numpy as np
+
+load_dotenv()
+
+host=os.getenv("host")
+user=os.getenv("user")
+password=os.getenv("password")
+db=os.getenv('db')
+local_raw_data_candidates = [
+    os.path.join("notebook", "data", "raw.csv"),
+    os.path.join("artifacts", "raw.csv"),
+]
 
 
-def read_sql_data() -> pd.DataFrame:
-	"""Read source dataset from MySQL (if configured) or CSV fallback.
+def _get_local_raw_data_path():
+    for candidate in local_raw_data_candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return None
 
-	Priority:
-	1) MySQL table read when DB env vars are present.
-	2) CSV path from DATA_SOURCE_PATH.
-	3) notebook/data/raw.csv
-	4) data/raw.csv
-	"""
-	mysql_host = os.environ.get("MYSQL_HOST")
-	mysql_user = os.environ.get("MYSQL_USER")
-	mysql_password = os.environ.get("MYSQL_PASSWORD")
-	mysql_db = os.environ.get("MYSQL_DB")
-	mysql_table = os.environ.get("MYSQL_TABLE", "students")
 
-	if all([mysql_host, mysql_user, mysql_password, mysql_db]):
-		try:
-			pymysql = importlib.import_module("pymysql")
 
-			connection = pymysql.connect(
-				host=mysql_host,
-				user=mysql_user,
-				password=mysql_password,
-				database=mysql_db,
-				port=int(os.environ.get("MYSQL_PORT", "3306")),
-			)
-			try:
-				return pd.read_sql_query(f"SELECT * FROM {mysql_table}", connection)
-			finally:
-				connection.close()
-		except ModuleNotFoundError as exc:
-			raise ModuleNotFoundError(
-				"pymysql is required for MySQL ingestion. Install it or use CSV source."
-			) from exc
+def read_sql_data():
+    logging.info("Reading SQL database started")
+    try:
+        local_raw_data_path = _get_local_raw_data_path()
 
-	candidate_paths = [
-		os.environ.get("DATA_SOURCE_PATH"),
-		os.path.join("notebook", "data", "raw.csv"),
-		os.path.join("data", "raw.csv"),
-	]
-	source_path = next((p for p in candidate_paths if p and os.path.exists(p)), None)
+        if local_raw_data_path is not None and not all([host, user, password, db]):
+            logging.info("Database credentials are missing; reading local raw data instead")
+            return pd.read_csv(local_raw_data_path)
 
-	if source_path is None:
-		raise FileNotFoundError(
-			"Raw data file not found. Add CSV at notebook/data/raw.csv or data/raw.csv, "
-			"or set DATA_SOURCE_PATH, or configure MySQL env vars."
-		)
+        mydb=pymysql.connect(
+            host=host,
+            user=user,
+            password=password,
+            db=db
+        )
+        logging.info("Connection Established",mydb)
+        df=pd.read_sql_query('Select * from students',mydb)
+        print(df.head())
 
-	return pd.read_csv(source_path)
+        return df
+
+
+
+    except Exception as ex:
+        local_raw_data_path = _get_local_raw_data_path()
+        if local_raw_data_path is not None:
+            logging.info("Falling back to local raw data after SQL connection failed")
+            return pd.read_csv(local_raw_data_path)
+        raise CustomException(ex, sys)
+    
+def save_object(file_path, obj):
+    try:
+        dir_path = os.path.dirname(file_path)
+
+        os.makedirs(dir_path, exist_ok=True)
+
+        with open(file_path, "wb") as file_obj:
+            pickle.dump(obj, file_obj)
+
+    except Exception as e:
+        raise CustomException(e, sys)
+
+def evaluate_models(X_train, y_train,X_test,y_test,models,param):
+    try:
+        report = {}
+
+        for i in range(len(list(models))):
+            model = list(models.values())[i]
+            para=param[list(models.keys())[i]]
+
+            gs = GridSearchCV(model,para,cv=3)
+            gs.fit(X_train,y_train)
+
+            model.set_params(**gs.best_params_)
+            model.fit(X_train,y_train)
+
+            #model.fit(X_train, y_train)  # Train model
+
+            y_train_pred = model.predict(X_train)
+
+            y_test_pred = model.predict(X_test)
+
+            train_model_score = r2_score(y_train, y_train_pred)
+
+            test_model_score = r2_score(y_test, y_test_pred)
+
+            report[list(models.keys())[i]] = test_model_score
+
+        return report
+
+    except Exception as e:
+        raise CustomException(e, sys)
