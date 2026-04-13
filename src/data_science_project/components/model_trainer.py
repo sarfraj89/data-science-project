@@ -122,27 +122,31 @@ class ModelTrainer:
 
             best_params = params[actual_model]
 
+            predicted=best_model.predict(X_test)
+            r2_square = r2_score(y_test, predicted)
+
             if mlflow is not None:
-                mlflow.set_registry_uri("https://dagshub.com/krishnaik06/mlprojecthindi.mlflow")
-                tracking_url_type_store = urlparse(mlflow.get_tracking_uri()).scheme
+                try:
+                    mlflow.set_registry_uri("https://dagshub.com/krishnaik06/mlprojecthindi.mlflow")
+                    tracking_url_type_store = urlparse(mlflow.get_tracking_uri()).scheme
 
-                with mlflow.start_run():
+                    with mlflow.start_run():
 
-                    predicted_qualities = best_model.predict(X_test)
+                        (rmse, mae, r2) = self.eval_metrics(y_test, predicted)
 
-                    (rmse, mae, r2) = self.eval_metrics(y_test, predicted_qualities)
+                        mlflow.log_params(best_params)
 
-                    mlflow.log_params(best_params)
-
-                    mlflow.log_metric("rmse", rmse)
-                    mlflow.log_metric("r2", r2)
-                    mlflow.log_metric("mae", mae)
+                        mlflow.log_metric("rmse", rmse)
+                        mlflow.log_metric("r2", r2)
+                        mlflow.log_metric("mae", mae)
 
 
-                    if tracking_url_type_store != "file":
-                        mlflow.sklearn.log_model(best_model, "model", registered_model_name=actual_model)
-                    else:
-                        mlflow.sklearn.log_model(best_model, "model")
+                        if tracking_url_type_store != "file":
+                            mlflow.sklearn.log_model(best_model, "model", registered_model_name=actual_model)
+                        else:
+                            mlflow.sklearn.log_model(best_model, "model")
+                except Exception as mlflow_error:
+                    logging.warning(f"MLflow logging skipped due to error: {mlflow_error}")
             else:
                 logging.info("mlflow is not installed; skipping model registry logging")
 
@@ -157,10 +161,6 @@ class ModelTrainer:
                 file_path=self.model_trainer_config.trained_model_file_path,
                 obj=best_model
             )
-
-            predicted=best_model.predict(X_test)
-
-            r2_square = r2_score(y_test, predicted)
             return r2_square
 
 
